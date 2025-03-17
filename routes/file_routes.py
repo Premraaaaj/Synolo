@@ -6,6 +6,8 @@ from datetime import datetime
 from bson import ObjectId
 import logging
 from utils import calculate_file_hash
+from typing import Dict, List
+from utils import scan_directory, process_file_for_staging
 
 bp = Blueprint('file_routes', __name__)
 client = MongoClient('mongodb://localhost:27017/')
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 @bp.route('/stage/<repo_name>', methods=['POST'])
 def stage_file(repo_name):
     """
-    Stage a file for commit
+    Stage files for commit
     ---
     tags:
       - Repositories
@@ -38,33 +40,27 @@ def stage_file(repo_name):
           properties:
             path:
               type: string
-              description: Absolute path of the file to stage
+              description: Absolute path of file or directory to stage
     responses:
       200:
-        description: File staged successfully
+        description: Files staged successfully
         schema:
           type: object
           properties:
             message:
               type: string
-              example: File "C:/Users/file.txt" staged successfully
-            file_info:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: file.txt
-                hash:
-                  type: string
-                  example: "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2"
+              example: "3 files staged successfully"
+            staged_files:
+              type: array
+              items:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  hash:
+                    type: string
       400:
-        description: Error in staging file
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: File does not exist
+        description: Error in staging
     """
     try:
         # Check repository
@@ -75,54 +71,60 @@ def stage_file(repo_name):
         # Validate request
         data = request.json
         if not data or 'path' not in data:
-            return jsonify({'error': 'File path is required'}), 400
+            return jsonify({'error': 'Path is required'}), 400
 
         source_path = data['path'].replace('\\', '/')
         if not os.path.exists(source_path):
-            return jsonify({'error': 'Source file does not exist'}), 400
+            return jsonify({'error': 'Path does not exist'}), 400
 
-        # Process file
-        file_name = os.path.basename(source_path)
-        file_hash = calculate_file_hash(source_path)
-        folder = os.path.dirname(source_path)
+        staged_files = []
+        file_updates = []
 
-        # Read file content
-        with open(source_path, 'rb') as f:
-            file_content = f.read()
+        if os.path.isfile(source_path):
+            # Handle single file
+            file_data = process_file_for_staging(source_path)
+            file_data['path'] = os.path.basename(source_path)
+            file_updates.append(file_data)
+            staged_files.append({
+                'path': file_data['path'],
+                'hash': file_data['sha']
+            })
+        else:
+            # Handle directory
+            for rel_path, abs_path in scan_directory(source_path):
+                file_data = process_file_for_staging(abs_path)
+                file_data['path'] = rel_path
+                file_updates.append(file_data)
+                staged_files.append({
+                    'path': rel_path,
+                    'hash': file_data['sha']
+                })
 
-        # Create or update staging document
+        # Update staging collection with all files under root
         staging_collection.update_one(
             {'repo_name': repo_name},
             {
                 '$set': {
                     'repo_name': repo_name,
-                    f'folders.{folder}': [{
-                        'filename': file_name,
-                        'sha': file_hash,
-                        'content': file_content,
-                        'staged_at': datetime.utcnow()
-                    }]
+                    'files': file_updates
                 }
             },
             upsert=True
         )
 
         return jsonify({
-            'message': f'File "{source_path}" staged successfully',
-            'file_info': {
-                'name': file_name,
-                'hash': file_hash
-            }
+            'message': f'{len(staged_files)} file(s) staged successfully',
+            'staged_files': staged_files
         }), 200
 
     except Exception as e:
-        logger.error(f"Error staging file: {str(e)}")
-        return jsonify({'error': f'Error staging file: {str(e)}'}), 400
+        logger.error(f"Error staging files: {str(e)}")
+        return jsonify({'error': f'Error staging files: {str(e)}'}), 400
 
-@bp.route('/unstage/<repo_name>/<file_path>', methods=['DELETE'])
-def unstage_file(repo_name, file_path):
+@bp.route('/unstage/<repo_name>', methods=['DELETE'])
+def unstage_all(repo_name):
     """
-    Unstage a file
+    Unstage all files or specific directory
     ---
     tags:
       - Repositories
@@ -132,35 +134,65 @@ def unstage_file(repo_name, file_path):
         type: string
         required: true
         description: The name of the repository
-      - name: file_path
-        in: path
+      - name: directory
+        in: query
         type: string
-        required: true
-        description: The path of the file to unstage
+        required: false
+        description: Optional directory path to unstage (defaults to all files)
     responses:
       200:
-        description: File unstaged successfully
+        description: Files unstaged successfully
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "All files unstaged successfully"
+            unstaged_count:
+              type: integer
+              example: 3
       400:
-        description: Error message
+        description: Error in unstaging
     """
-    folder = os.path.dirname(file_path).replace('\\', '/')
-    file_name = os.path.basename(file_path)
-    staging_doc = staging_collection.find_one({'repo_name': repo_name})
-    if not staging_doc or folder not in staging_doc['folders']:
-        return jsonify({'error': 'File not found in staging area'}), 400
+    try:
+        directory = request.args.get('directory', '')
+        
+        staging_doc = staging_collection.find_one({'repo_name': repo_name})
+        if not staging_doc:
+            return jsonify({'error': 'No files in staging area'}), 400
 
-    files = staging_doc['folders'][folder]
-    updated_files = [f for f in files if f['filename'] != file_name]
-    if len(files) == len(updated_files):
-        return jsonify({'error': 'File not found in staging area'}), 400
+        if not directory:
+            # Unstage everything
+            count = len(staging_doc.get('files', []))
+            staging_collection.delete_one({'repo_name': repo_name})
+            return jsonify({
+                'message': 'All files unstaged successfully',
+                'unstaged_count': count
+            }), 200
+        
+        # Unstage specific directory
+        original_count = len(staging_doc.get('files', []))
+        updated_files = [
+            f for f in staging_doc.get('files', [])
+            if not f['path'].startswith(directory)
+        ]
+        unstaged_count = original_count - len(updated_files)
+        
+        if unstaged_count == 0:
+            return jsonify({'error': 'No files found in specified directory'}), 400
 
-    if updated_files:
-        staging_doc['folders'][folder] = updated_files
-    else:
-        del staging_doc['folders'][folder]
+        staging_collection.update_one(
+            {'repo_name': repo_name},
+            {'$set': {'files': updated_files}}
+        )
 
-    staging_collection.update_one({'repo_name': repo_name}, {'$set': staging_doc})
-    return jsonify({'message': f'File "{file_path}" unstaged successfully'}), 200
+        return jsonify({
+            'message': f'Unstaged {unstaged_count} files from {directory}',
+            'unstaged_count': unstaged_count
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Error unstaging files: {str(e)}'}), 400
 
 @bp.route('/staged/<repo_name>', methods=['GET'])
 def list_staged_files(repo_name):
@@ -179,10 +211,10 @@ def list_staged_files(repo_name):
       200:
         description: List of staged files
     """
-    staged_files = staging_collection.find_one({'repo_name': repo_name}, {'_id': 0, 'folders': 1})
+    staged_files = staging_collection.find_one({'repo_name': repo_name}, {'_id': 0, 'files': 1})
     if not staged_files:
         return jsonify({'staged_files': []}), 200
-    return jsonify({'staged_files': staged_files['folders']}), 200
+    return jsonify({'staged_files': staged_files.get('files', [])}), 200
 
 @bp.route('/commit/<repo_name>', methods=['POST'])
 def commit_changes(repo_name):
@@ -237,14 +269,13 @@ def commit_changes(repo_name):
         'timestamp': datetime.utcnow(),
         'message': commit_message,
         'author': author,
-        'folders': staging_doc['folders']
+        'files': staging_doc['files']
     }
 
     repo['commits'].append(commit_data)
-    for folder, files in staging_doc['folders'].items():
-        if folder not in repo['folders']:
-            repo['folders'][folder] = []
-        repo['folders'][folder].extend(files)
+    if 'files' not in repo:
+        repo['files'] = []
+    repo['files'].extend(staging_doc['files'])
 
     repos_collection.update_one({'repo_name': repo_name}, {'$set': repo})
     staging_collection.delete_one({'repo_name': repo_name})
@@ -273,10 +304,10 @@ def get_commit_history(repo_name):
         return jsonify({'error': 'Repository not found'}), 404
     return jsonify({'commits': repo['commits']}), 200
 
-@bp.route('/diff/<repo_name>/<file_path>', methods=['GET'])
-def get_file_diff(repo_name, file_path):
+@bp.route('/diff/<repo_name>', methods=['GET'])
+def get_file_diff(repo_name):
     """
-    Get file differences
+    Get differences between staged files and repository state
     ---
     tags:
       - Repositories
@@ -286,37 +317,112 @@ def get_file_diff(repo_name, file_path):
         type: string
         required: true
         description: The name of the repository
-      - name: file_path
-        in: path
-        type: string
-        required: true
-        description: The path of the file
     responses:
       200:
         description: File differences retrieved successfully
+      404:
+        description: Repository not found
+      400:
+        description: Error generating diff
     """
-    repo = repos_collection.find_one({'repo_name': repo_name})
-    if not repo:
-        return jsonify({'error': 'Repository not found'}), 404
+    try:
+        # Get repository and staging documents
+        repo = repos_collection.find_one({'repo_name': repo_name})
+        if not repo:
+            return jsonify({'error': 'Repository not found'}), 404
 
-    folder = os.path.dirname(file_path).replace('\\', '/')
-    file_name = os.path.basename(file_path)
-    last_commit = repo['commits'][-1] if repo['commits'] else None
-    if not last_commit:
-        return jsonify({'error': 'No previous versions found'}), 400
+        staging = staging_collection.find_one({'repo_name': repo_name})
+        if not staging:
+            return jsonify({'diffs': []}), 200
 
-    file_version = next((f for f in last_commit['folders'].get(folder, []) if f['filename'] == file_name), None)
-    if not file_version:
-        return jsonify({'error': 'File not found in last commit'}), 404
+        diffs = []
+        staged_files = {f['path']: f for f in staging.get('files', [])}
+        repo_files = {f['path']: f for f in repo.get('files', [])}
 
-    current_file = staging_collection.find_one({'repo_name': repo_name, f'folders.{folder}.filename': file_name}, {'folders.$': 1})
-    if not current_file:
-        return jsonify({'error': 'File not found in staging area'}), 400
+        # Check all staged files
+        for path, staged_file in staged_files.items():
+            repo_file = repo_files.get(path)
+            
+            if not repo_file:
+                # Handle new file
+                try:
+                    staged_content = staged_file['content'].decode('utf-8').splitlines()
+                    diff = difflib.unified_diff(
+                        [], 
+                        staged_content,
+                        fromfile='/dev/null',
+                        tofile=path
+                    )
+                    diffs.append({
+                        'file_path': path,
+                        'status': 'new',
+                        'diff': '\n'.join(list(diff)),
+                        'is_binary': False
+                    })
+                except UnicodeDecodeError:
+                    diffs.append({
+                        'file_path': path,
+                        'status': 'new',
+                        'diff': 'Binary file - diff not available',
+                        'is_binary': True
+                    })
+            else:
+                # Handle modified file
+                try:
+                    staged_content = staged_file['content'].decode('utf-8').splitlines()
+                    repo_content = repo_file['content'].decode('utf-8').splitlines()
+                    
+                    if staged_file['sha'] != repo_file['sha']:
+                        diff = difflib.unified_diff(
+                            repo_content,
+                            staged_content,
+                            fromfile=f'a/{path}',
+                            tofile=f'b/{path}'
+                        )
+                        diffs.append({
+                            'file_path': path,
+                            'status': 'modified',
+                            'diff': '\n'.join(list(diff)),
+                            'is_binary': False
+                        })
+                except UnicodeDecodeError:
+                    diffs.append({
+                        'file_path': path,
+                        'status': 'modified',
+                        'diff': 'Binary file - diff not available',
+                        'is_binary': True
+                    })
 
-    current_content = current_file['folders'][folder][0]['content'].decode('utf-8').splitlines()
-    last_content = file_version['content'].decode('utf-8').splitlines()
-    diff = difflib.unified_diff(last_content, current_content, fromfile='last_version', tofile='current_version')
-    return jsonify({'diff': '\n'.join(diff)}), 200
+        # Check for deleted files
+        for path, repo_file in repo_files.items():
+            if path not in staged_files:
+                try:
+                    repo_content = repo_file['content'].decode('utf-8').splitlines()
+                    diff = difflib.unified_diff(
+                        repo_content,
+                        [],
+                        fromfile=path,
+                        tofile='/dev/null'
+                    )
+                    diffs.append({
+                        'file_path': path,
+                        'status': 'deleted',
+                        'diff': '\n'.join(list(diff)),
+                        'is_binary': False
+                    })
+                except UnicodeDecodeError:
+                    diffs.append({
+                        'file_path': path,
+                        'status': 'deleted',
+                        'diff': 'Binary file - diff not available',
+                        'is_binary': True
+                    })
+
+        return jsonify({'diffs': diffs}), 200
+
+    except Exception as e:
+        logger.error(f"Error generating diff: {str(e)}")
+        return jsonify({'error': f'Error generating diff: {str(e)}'}), 400
 
 @bp.route('/rollback/<repo_name>/<file_path>', methods=['POST'])
 def rollback_changes(repo_name, file_path):
@@ -384,21 +490,16 @@ def rollback_changes(repo_name, file_path):
         if not commit:
             return jsonify({'error': 'No previous commits found'}), 400
 
-    folder = os.path.dirname(file_path).replace('\\', '/')
-    file_name = os.path.basename(file_path)
-    file_version = next((f for f in commit['folders'].get(folder, []) if f['filename'] == file_name), None)
+    file_version = next((f for f in commit['files'] if f['path'] == file_path), None)
     if not file_version:
         return jsonify({'error': 'File not found in commit'}), 404
 
     try:
         staging_doc = staging_collection.find_one({'repo_name': repo_name})
         if not staging_doc:
-            staging_doc = {'repo_name': repo_name, 'folders': {}}
+            staging_doc = {'repo_name': repo_name, 'files': []}
 
-        if folder not in staging_doc['folders']:
-            staging_doc['folders'][folder] = []
-
-        staging_doc['folders'][folder].append(file_version)
+        staging_doc['files'].append(file_version)
         staging_collection.update_one({'repo_name': repo_name}, {'$set': staging_doc}, upsert=True)
 
         return jsonify({
