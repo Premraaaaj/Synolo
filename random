@@ -3,3 +3,6 @@
 curl -X POST http://localhost:5000/stage/test-repo ^
   -H "Content-Type: application/json" ^
   -d "{\"path\": \"C:\\Users\\VIVEK\\Desktop\\test-repo-vcs\\hello.txt\"}"
+
+curl -X DELETE ^
+  http://localhost:5000/unstage/test-repo/"C:\Users\VIVEK\Desktop\test-repo-vcs\hello.txt"
