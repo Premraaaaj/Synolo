@@ -1,0 +1,5 @@
+# Assuming main.py is in c:\Users\VIVEK\Desktop\vcs\test-repo\src\main.py
+
+curl -X POST http://localhost:5000/stage/test-repo ^
+  -H "Content-Type: application/json" ^
+  -d "{\"path\": \"C:\\Users\\VIVEK\\Desktop\\test-repo-vcs\\hello.txt\"}"
