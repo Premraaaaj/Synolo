@@ -1,2 +1,10 @@
-Flask==2.0.1
-pymongo==3.12.0
+Flask
+Werkzeug
+pymongo
+flasgger
+python-dotenv
+bson
+click
+itsdangerous
+Jinja2
+MarkupSafe

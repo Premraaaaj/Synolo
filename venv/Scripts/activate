@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\VIVEK\Desktop\synolo_vcs\venv"
+VIRTUAL_ENV="C:\Users\VIVEK\Desktop\vcs\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

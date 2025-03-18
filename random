@@ -1,8 +1,18 @@
-# Assuming main.py is in c:\Users\VIVEK\Desktop\vcs\test-repo\src\main.py
-
+# Stage entire project folder
 curl -X POST http://localhost:5000/stage/test-repo ^
   -H "Content-Type: application/json" ^
-  -d "{\"path\": \"C:/Users/VIVEK/Desktop/proj_tex\"}"
+  -d "{\"path\": \""C:/Users/VIVEK/Desktop/test-repo-vcs"\"}"
 
-curl -X DELETE ^
-  http://localhost:5000/unstage/test-repo/"C:\Users\VIVEK\Desktop\test-repo-vcs\hello.txt"
+
+# Commit
+curl -X POST http://localhost:5000/commit/test-repo ^
+  -H "Content-Type: application/json" ^
+  -d "{\"message\": \"Made few changes\", \"author\": \"Admin\"}"
+
+# Rollback
+
+
+# Clone
+curl -X POST http://localhost:5000/clone/test-repo ^
+  -H "Content-Type: application/json" ^
+  -d "{\"target_path\": \"C:/Users/VIVEK/Desktop/cloned_result\"}"

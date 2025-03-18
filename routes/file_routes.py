@@ -210,11 +210,41 @@ def list_staged_files(repo_name):
     responses:
       200:
         description: List of staged files
+        schema:
+          type: object
+          properties:
+            staged_files:
+              type: array
+              items:
+                type: object
+                properties:
+                  path:
+                    type: string
+                  hash:
+                    type: string
+                  size:
+                    type: integer
     """
-    staged_files = staging_collection.find_one({'repo_name': repo_name}, {'_id': 0, 'files': 1})
-    if not staged_files:
-        return jsonify({'staged_files': []}), 200
-    return jsonify({'staged_files': staged_files.get('files', [])}), 200
+    try:
+        staged_files = staging_collection.find_one({'repo_name': repo_name})
+        if not staged_files:
+            return jsonify({'staged_files': []}), 200
+
+        # Convert binary content to metadata
+        serializable_files = []
+        for file in staged_files.get('files', []):
+            serializable_files.append({
+                'path': file['path'],
+                'hash': file['sha'],
+                'size': len(file['content']),
+                'staged_at': file.get('staged_at', datetime.utcnow()).isoformat()
+            })
+
+        return jsonify({'staged_files': serializable_files}), 200
+
+    except Exception as e:
+        logger.error(f"Error listing staged files: {str(e)}")
+        return jsonify({'error': f'Error listing staged files: {str(e)}'}), 400
 
 @bp.route('/commit/<repo_name>', methods=['POST'])
 def commit_changes(repo_name):
@@ -298,11 +328,71 @@ def get_commit_history(repo_name):
     responses:
       200:
         description: Commit history retrieved successfully
+        schema:
+          type: object
+          properties:
+            commits:
+              type: array
+              items:
+                type: object
+                properties:
+                  commit_id:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+                  message:
+                    type: string
+                  author:
+                    type: string
+                  file_count:
+                    type: integer
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        path:
+                          type: string
+                        sha:
+                          type: string
+                        size:
+                          type: integer
     """
-    repo = repos_collection.find_one({'repo_name': repo_name}, {'commits': 1, '_id': 0})
-    if not repo:
-        return jsonify({'error': 'Repository not found'}), 404
-    return jsonify({'commits': repo['commits']}), 200
+    try:
+        repo = repos_collection.find_one({'repo_name': repo_name})
+        if not repo:
+            return jsonify({'error': 'Repository not found'}), 404
+
+        # Process commits to remove binary content
+        serializable_commits = []
+        for commit in repo.get('commits', []):
+            # Process files in commit
+            files = []
+            for file in commit.get('files', []):
+                files.append({
+                    'path': file['path'],
+                    'sha': file['sha'],
+                    'size': len(file['content']),
+                    'modified_at': datetime.utcnow().isoformat()
+                })
+
+            # Create serializable commit object
+            commit_obj = {
+                'commit_id': commit['commit_id'],
+                'timestamp': commit['timestamp'].isoformat(),
+                'message': commit['message'],
+                'author': commit['author'],
+                'file_count': len(files),
+                'files': files
+            }
+            serializable_commits.append(commit_obj)
+
+        return jsonify({'commits': serializable_commits}), 200
+
+    except Exception as e:
+        logger.error(f"Error retrieving commit history: {str(e)}")
+        return jsonify({'error': f'Error retrieving commit history: {str(e)}'}), 400
 
 @bp.route('/diff/<repo_name>', methods=['GET'])
 def get_file_diff(repo_name):
@@ -424,88 +514,181 @@ def get_file_diff(repo_name):
         logger.error(f"Error generating diff: {str(e)}")
         return jsonify({'error': f'Error generating diff: {str(e)}'}), 400
 
-@bp.route('/rollback/<repo_name>/<file_path>', methods=['POST'])
-def rollback_changes(repo_name, file_path):
+@bp.route('/rollback/<repo_name>', methods=['POST'])
+@bp.route('/rollback/<repo_name>/<path:file_path>', methods=['POST'])
+def rollback(repo_name, file_path=None):
     """
-    Rollback changes to a file
+    Rollback repository or specific file to previous commit state
+    """
+    try:
+        repo = repos_collection.find_one({'repo_name': repo_name})
+        if not repo:
+            return jsonify({'error': 'Repository not found'}), 404
+
+        commits = repo.get('commits', [])
+        if not commits:
+            return jsonify({'error': 'No commits found in repository'}), 400
+
+        # Handle single commit case - rollback to empty state
+        if len(commits) == 1:
+            if file_path:
+                # Remove single file from staging and repo
+                staging_collection.update_one(
+                    {'repo_name': repo_name},
+                    {'$pull': {'files': {'path': file_path}}}
+                )
+                repos_collection.update_one(
+                    {'repo_name': repo_name},
+                    {'$pull': {'files': {'path': file_path}}}
+                )
+                return jsonify({
+                    'message': f'File {file_path} rolled back to empty state',
+                    'files_affected': 1
+                }), 200
+            else:
+                # Clear entire repo
+                staging_collection.delete_one({'repo_name': repo_name})
+                repos_collection.update_one(
+                    {'repo_name': repo_name},
+                    {'$set': {'files': [], 'commits': []}}
+                )
+                return jsonify({
+                    'message': 'Repository rolled back to empty state',
+                    'files_affected': len(commits[0].get('files', []))
+                }), 200
+
+        # Get previous commit (second to last)
+        previous_commit = commits[-2]
+
+        if file_path:
+            # Rollback specific file
+            file_version = next(
+                (f for f in previous_commit['files'] if f['path'] == file_path),
+                None
+            )
+            if not file_version:
+                return jsonify({'error': 'File not found in previous commit'}), 404
+
+            # Update staging area
+            staging_doc = staging_collection.find_one({'repo_name': repo_name}) or {
+                'repo_name': repo_name,
+                'files': []
+            }
+            file_index = next(
+                (i for i, f in enumerate(staging_doc['files']) 
+                 if f['path'] == file_path),
+                -1
+            )
+            if file_index >= 0:
+                staging_doc['files'][file_index] = file_version
+            else:
+                staging_doc['files'].append(file_version)
+
+            staging_collection.update_one(
+                {'repo_name': repo_name},
+                {'$set': staging_doc},
+                upsert=True
+            )
+
+            return jsonify({
+                'message': f'File {file_path} rolled back to previous commit',
+                'files_affected': 1
+            }), 200
+        else:
+            # Rollback entire repository
+            staging_doc = {
+                'repo_name': repo_name,
+                'files': previous_commit['files']
+            }
+            staging_collection.update_one(
+                {'repo_name': repo_name},
+                {'$set': staging_doc},
+                upsert=True
+            )
+
+            # Remove latest commit
+            commits.pop()
+            repos_collection.update_one(
+                {'repo_name': repo_name},
+                {'$set': {'commits': commits}}
+            )
+
+            return jsonify({
+                'message': 'Repository rolled back to previous commit',
+                'files_affected': len(previous_commit['files'])
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error during rollback: {str(e)}")
+        return jsonify({'error': f'Error during rollback: {str(e)}'}), 400
+    
+
+
+@bp.route('/clone/<repo_name>', methods=['POST'])
+def clone_repository(repo_name):
+    """
+    Clone repository to specified path with repo name as root directory
     ---
     tags:
-      - Version Control
+      - Repositories
     parameters:
       - name: repo_name
         in: path
         type: string
         required: true
-        description: Repository name
-      - name: file_path
-        in: path
-        type: string
+        description: Repository name to clone
+      - name: body
+        in: body
         required: true
-        description: Path to the file to rollback
-      - name: commit_id
-        in: query
-        type: string
-        required: false
-        description: Optional specific commit ID to rollback to
-    responses:
-      200:
-        description: File rolled back successfully
         schema:
           type: object
+          required:
+            - target_path
           properties:
-            message:
+            target_path:
               type: string
-              example: File test.py rolled back successfully
-            commit_id:
-              type: string
-              example: 507f1f77bcf86cd799439011
-      400:
-        description: Error in rollback operation
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: No previous commits found
-      404:
-        description: Repository or file not found
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: File not found in commit
+              description: Parent directory where repository should be cloned
     """
-    commit_id = request.args.get('commit_id')
-    repo = repos_collection.find_one({'repo_name': repo_name})
-    if not repo:
-        return jsonify({'error': 'Repository not found'}), 404
-
-    if commit_id:
-        commit = next((c for c in repo['commits'] if c['commit_id'] == commit_id), None)
-        if not commit:
-            return jsonify({'error': 'Commit not found'}), 404
-    else:
-        commit = repo['commits'][-1] if repo['commits'] else None
-        if not commit:
-            return jsonify({'error': 'No previous commits found'}), 400
-
-    file_version = next((f for f in commit['files'] if f['path'] == file_path), None)
-    if not file_version:
-        return jsonify({'error': 'File not found in commit'}), 404
-
     try:
-        staging_doc = staging_collection.find_one({'repo_name': repo_name})
-        if not staging_doc:
-            staging_doc = {'repo_name': repo_name, 'files': []}
+        # Validate request
+        data = request.json
+        if not data or 'target_path' not in data:
+            return jsonify({'error': 'Target path is required'}), 400
 
-        staging_doc['files'].append(file_version)
-        staging_collection.update_one({'repo_name': repo_name}, {'$set': staging_doc}, upsert=True)
+        base_path = data['target_path'].replace('\\', '/')
+        # Create repo directory inside target path
+        target_path = os.path.join(base_path, repo_name)
+        
+        # Get repository
+        repo = repos_collection.find_one({'repo_name': repo_name})
+        if not repo:
+            return jsonify({'error': 'Repository not found'}), 404
+
+        # Create target directory with repo name
+        os.makedirs(target_path, exist_ok=True)
+
+        files_created = 0
+        # Get latest versions of files
+        latest_files = {}
+        for commit in repo.get('commits', []):
+            for file in commit.get('files', []):
+                latest_files[file['path']] = file
+
+        # Create files
+        for file_path, file_data in latest_files.items():
+            full_path = os.path.join(target_path, file_path)
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            
+            with open(full_path, 'wb') as f:
+                f.write(file_data['content'])
+            files_created += 1
 
         return jsonify({
-            'message': f'File {file_path} rolled back successfully',
-            'commit_id': commit['commit_id']
+            'message': f'Repository cloned successfully to {target_path}',
+            'files_created': files_created,
+            'repo_name': repo_name
         }), 200
 
     except Exception as e:
-        return jsonify({'error': f'Error during rollback: {str(e)}'}), 400
+        logger.error(f"Error cloning repository: {str(e)}")
+        return jsonify({'error': f'Error cloning repository: {str(e)}'}), 400
