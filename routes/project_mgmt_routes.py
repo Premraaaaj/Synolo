@@ -7,7 +7,7 @@ import logging
 
 bp = Blueprint('project_mgmt', __name__)
 client = MongoClient('mongodb://localhost:27017/')
-db = client['synolo_test_project_mgmt']
+db = client['project_mgmt']
 
 # Collections
 users = db['users']
@@ -102,6 +102,32 @@ def delete_project(project_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@bp.route('/projects/<project_id>', methods=['GET'])
+def get_project(project_id):
+    """Get project details"""
+    try:
+        # Try to find project by MongoDB _id first
+        try:
+            project = projects.find_one({'_id': ObjectId(project_id)})
+        except:
+            # If not found by _id, try project_id
+            project = projects.find_one({'project_id': project_id})
+
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+
+        return jsonify({
+            'project_id': project.get('project_id', str(project['_id'])),
+            'project_name': project['project_name'],
+            'project_description': project.get('project_description', ''),
+            'members': project.get('members', []),
+            'owner_id': project['owner_id'],
+            'tasks': project.get('task', [])  # Include task IDs
+        }), 200
+    except Exception as e:
+        print(f"Error in get_project: {str(e)}")  # Add logging
+        return jsonify({'error': str(e)}), 400
+
 @bp.route('/tasks', methods=['GET'])
 def get_all_tasks():
     """Get all tasks"""
@@ -121,22 +147,31 @@ def get_all_tasks():
 def get_tasks_by_project(project_id):
     """Get tasks for specific project"""
     try:
-        project = projects.find_one({'_id': ObjectId(project_id)})
+        # Try to find project by MongoDB _id first
+        try:
+            project = projects.find_one({'_id': ObjectId(project_id)})
+        except:
+            # If not found by _id, try project_id
+            project = projects.find_one({'project_id': project_id})
+
         if not project:
             return jsonify({'error': 'Project not found'}), 404
 
-        project_tasks = list(tasks.find({'project_id': project_id}))
+        # Get tasks for this project using the MongoDB _id
+        project_tasks = list(tasks.find({'project_id': str(project['_id'])}))
         return jsonify({
             'tasks': [{
-                'task_id': str(t['_id']),
+                'task_id': str(t['_id']),  # Use MongoDB _id as task_id
                 'task_name': t['task_name'],
                 'status': t['status'],
                 'assigned_to': t['assigned_to'],
-                'issued_date': t['issued_date'].isoformat(),
-                'completion_date': t.get('completion_date', '').isoformat() if t.get('completion_date') else None
+                'issued_date': t['issued_date'],
+                'completion_date': t.get('completion_date')
             } for t in project_tasks]
         }), 200
+    
     except Exception as e:
+        print(f"Error in get_tasks_by_project: {str(e)}")  # Add logging
         return jsonify({'error': str(e)}), 400
 
 @bp.route('/projects/<project_id>/tasks', methods=['POST'])

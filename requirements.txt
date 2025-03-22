@@ -3,8 +3,8 @@ Werkzeug
 pymongo
 flasgger
 python-dotenv
-bson
 click
 itsdangerous
 Jinja2
 MarkupSafe
+flask-cors
