@@ -16,11 +16,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import routes
-from routes import repo_routes, file_routes
+from routes import repo_routes, file_routes, project_mgmt_routes
 
 # Register Blueprints
 app.register_blueprint(repo_routes.bp)
 app.register_blueprint(file_routes.bp)
+app.register_blueprint(project_mgmt_routes.bp)
 
 if __name__ == '__main__':
     from utils import setup_mongodb_indexes
