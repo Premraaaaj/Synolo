@@ -53,17 +53,40 @@ def login():
 
 @bp.route('/projects', methods=['GET'])
 def get_all_projects():
-    """Get all projects"""
-    all_projects = list(projects.find({}))
-    return jsonify({
-        'projects': [{
-            'project_id': str(p['_id']),
-            'project_name': p['project_name'],
-            'project_description': p.get('project_description', ''),
-            'members': p.get('members', []),
-            'owner_id': p['owner_id']
-        } for p in all_projects]
-    }), 200
+    """Get all projects for the current user"""
+    try:
+        # Get user_id from request headers
+        user_id = request.headers.get('X-User-ID')
+        if not user_id:
+            return jsonify({'error': 'User ID not provided'}), 400
+
+        # Find projects where user is either owner or member
+        user_projects = list(projects.find({
+            '$or': [
+                {'owner_id': user_id},
+                {'members': user_id}
+            ]
+        }))
+
+        # Convert ObjectId to string for JSON serialization
+        projects_list = []
+        for project in user_projects:
+            project['_id'] = str(project['_id'])
+            projects_list.append({
+                'project_id': project['_id'],
+                'project_name': project['project_name'],
+                'project_description': project.get('project_description', ''),
+                'members': project.get('members', []),
+                'owner_id': project['owner_id'],
+                'tasks': project.get('tasks', [])
+            })
+
+        return jsonify({
+            'projects': projects_list
+        }), 200
+    except Exception as e:
+        print(f"Error in get_all_projects: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/projects', methods=['POST'])
 def create_project():

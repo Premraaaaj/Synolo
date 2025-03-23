@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import ProjectsList from './components/projects/ProjectsList';
 import ProjectDetails from './components/projects/ProjectDetails';
 import CreateProject from './components/projects/CreateProject';
@@ -10,6 +10,7 @@ import './App.css';
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(null);
+    const location = useLocation();
 
     useEffect(() => {
         checkAuth();
@@ -33,7 +34,7 @@ const ProtectedRoute = ({ children }) => {
     }
 
     if (!isAuthenticated) {
-        return <Navigate to="/login" />;
+        return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
     return children;
@@ -42,14 +43,39 @@ const ProtectedRoute = ({ children }) => {
 function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [user, setUser] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Check if user is logged in
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-        }
+        checkUserAuth();
     }, []);
+
+    const checkUserAuth = async () => {
+        try {
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                const parsedUser = JSON.parse(storedUser);
+                setUser(parsedUser);
+                
+                // Verify the session is still valid
+                const response = await fetch('http://localhost:5000/api/auth/check-auth', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (!data.authenticated) {
+                    // Session is invalid, clear user data
+                    localStorage.removeItem('user');
+                    setUser(null);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking user auth:', error);
+            localStorage.removeItem('user');
+            setUser(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleLogout = async () => {
         try {
@@ -72,6 +98,10 @@ function App() {
         { path: '/version-control', label: 'Version Control', icon: '🔄' }
     ];
 
+    if (isLoading) {
+        return <div className="loading-screen">Loading...</div>;
+    }
+
     return (
         <Router>
             <div className="app-layout">
@@ -90,7 +120,7 @@ function App() {
                                 <button className="notification-btn">🔔</button>
                                 <div className="user-menu">
                                     <img src="https://via.placeholder.com/32" alt="User" className="user-avatar" />
-                                    <span>{user.email}</span>
+                                    <span>{user.username}</span>
                                     <button onClick={handleLogout} className="logout-btn">Logout</button>
                                 </div>
                             </div>
@@ -114,7 +144,8 @@ function App() {
 
                             <div className="main-content">
                                 <Routes>
-                                    <Route path="/login" element={<Navigate to="/projects" />} />
+                                    <Route path="/" element={<Navigate to="/projects" replace />} />
+                                    <Route path="/login" element={<Navigate to="/projects" replace />} />
                                     <Route path="/projects" element={
                                         <ProtectedRoute>
                                             <ProjectsList />
@@ -151,9 +182,9 @@ function App() {
                     </>
                 ) : (
                     <Routes>
-                        <Route path="/login" element={<Login />} />
+                        <Route path="/login" element={<Login onLoginSuccess={(userData) => setUser(userData)} />} />
                         <Route path="/signup" element={<SignUp />} />
-                        <Route path="*" element={<Navigate to="/login" />} />
+                        <Route path="*" element={<Navigate to="/login" replace />} />
                     </Routes>
                 )}
             </div>

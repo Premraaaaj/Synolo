@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import './Login.css';
 
-const Login = () => {
+const Login = ({ onLoginSuccess }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const [formData, setFormData] = useState({
@@ -14,13 +14,26 @@ const Login = () => {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        // Check if user is already logged in
+        const user = localStorage.getItem('user');
+        if (user) {
+            try {
+                const parsedUser = JSON.parse(user);
+                onLoginSuccess(parsedUser);
+                navigate('/projects', { replace: true });
+            } catch (error) {
+                console.error('Error parsing stored user:', error);
+                localStorage.removeItem('user');
+            }
+        }
+
         // Check for success message from signup
         if (location.state?.message) {
             setSuccessMessage(location.state.message);
             // Clear the message from location state
             window.history.replaceState({}, document.title);
         }
-    }, [location]);
+    }, [location, navigate, onLoginSuccess]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -57,19 +70,28 @@ const Login = () => {
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Login failed');
-            }
-
             const data = await response.json();
             console.log('Login response:', data);
 
+            if (!response.ok) {
+                throw new Error(data.error || 'Login failed');
+            }
+
+            // Create user object with the correct structure
+            const userData = {
+                user_id: data.user_id,
+                username: data.username
+            };
+
             // Store user data in localStorage
-            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('user', JSON.stringify(userData));
             
-            // Redirect to projects page
-            navigate('/projects');
+            // Update parent component's user state
+            onLoginSuccess(userData);
+            
+            // Navigate to projects page
+            navigate('/projects', { replace: true });
+
         } catch (err) {
             console.error('Login error:', err);
             if (err.message === 'Failed to fetch') {

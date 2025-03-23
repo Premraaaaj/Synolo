@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 import os
 import logging
+from .project_mgmt_routes import db  # Import the db instance from project_mgmt_routes
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -14,15 +15,9 @@ logger = logging.getLogger(__name__)
 # Initialize Blueprint
 bp = Blueprint('auth', __name__)
 
-# MongoDB connection
-try:
-    client = MongoClient('mongodb://localhost:27017/')
-    db = client['project_management']
-    users_collection = db['users']
-    logger.info("Successfully connected to MongoDB")
-except Exception as e:
-    logger.error(f"Failed to connect to MongoDB: {str(e)}")
-    raise
+# Use the same database connection
+users_collection = db['users']
+logger.info("Successfully connected to MongoDB using project_mgmt_routes connection")
 
 # Constants for rate limiting
 MAX_LOGIN_ATTEMPTS = 5
@@ -51,11 +46,22 @@ def signup():
         if not data or 'username' not in data or 'password' not in data:
             return jsonify({'error': 'Username and password are required'}), 400
 
-        username = data['username']
+        username = data['username'].strip()  # Remove leading/trailing spaces
         password = data['password']
 
+        # Validate username and password
+        if len(username) < 3:
+            return jsonify({'error': 'Username must be at least 3 characters long'}), 400
+        if len(password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters long'}), 400
+
         # Check if username already exists
-        if users_collection.find_one({'username': username}):
+        existing_user = users_collection.find_one({'username': username})
+        logger.debug(f"Checking for existing user: {username}")
+        logger.debug(f"Existing user found: {existing_user}")
+        
+        if existing_user:
+            logger.warning(f"Username already exists: {username}")
             return jsonify({'error': 'Username already taken'}), 409
 
         # Hash password
@@ -72,9 +78,10 @@ def signup():
 
         # Insert user into database
         result = users_collection.insert_one(user)
+        logger.debug(f"Insert result: {result}")
         
         if result.inserted_id:
-            logger.info(f"User {username} created successfully")
+            logger.info(f"User {username} created successfully with ID: {result.inserted_id}")
             return jsonify({
                 'message': 'User registered successfully',
                 'user': {
@@ -83,7 +90,7 @@ def signup():
                 }
             }), 201
         else:
-            logger.error("Failed to create user")
+            logger.error("Failed to create user - no inserted_id returned")
             return jsonify({'error': 'Failed to create user'}), 500
 
     except Exception as e:
@@ -99,11 +106,13 @@ def login():
         if not data or 'username' not in data or 'password' not in data:
             return jsonify({'error': 'Username and password are required'}), 400
 
-        username = data['username']
+        username = data['username'].strip()  # Remove leading/trailing spaces
         password = data['password']
 
         # Find user
         user = users_collection.find_one({'username': username})
+        logger.debug(f"Login attempt for user: {username}")
+        logger.debug(f"User found: {user}")
         
         if not user:
             logger.warning(f"Login attempt failed for non-existent user: {username}")
@@ -189,4 +198,29 @@ def check_auth():
         return jsonify({'authenticated': False})
     except Exception as e:
         logger.error(f"Auth check error: {str(e)}")
-        return jsonify({'authenticated': False}) 
+        return jsonify({'authenticated': False})
+
+@bp.route('/db-status', methods=['GET'])
+def check_db_status():
+    try:
+        # Get all collections
+        collections = db.list_collection_names()
+        
+        # Get user count
+        user_count = users_collection.count_documents({})
+        
+        # Get sample user if any exists
+        sample_user = users_collection.find_one({}, {'username': 1, '_id': 0})
+        
+        return jsonify({
+            'status': 'connected',
+            'collections': collections,
+            'user_count': user_count,
+            'sample_user': sample_user
+        })
+    except Exception as e:
+        logger.error(f"Database status check error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500 
