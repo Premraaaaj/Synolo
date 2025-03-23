@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { projectService } from '../../services/projectService';
+import ProjectBacklog from './ProjectBacklog';
 import './ProjectDetails.css';
 
 const ProjectDetails = () => {
@@ -20,6 +21,7 @@ const ProjectDetails = () => {
     });
     const [editingTaskId, setEditingTaskId] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
+    const [showBacklog, setShowBacklog] = useState(false);
 
     useEffect(() => {
         fetchProjectData();
@@ -207,7 +209,23 @@ const ProjectDetails = () => {
                 <button className="back-button" onClick={() => navigate('/projects')}>
                     ← Back to Projects
                 </button>
-                <h1>{project.project_name}</h1>
+                <div className="header-content">
+                    <h1>{project.project_name}</h1>
+                    <div className="header-actions">
+                        <button 
+                            className="backlog-btn"
+                            onClick={() => setShowBacklog(true)}
+                        >
+                            View Backlog
+                        </button>
+                        <button 
+                            className="create-task-btn"
+                            onClick={() => setShowCreateTaskModal(true)}
+                        >
+                            + Create Task
+                        </button>
+                    </div>
+                </div>
                 <div className="project-meta">
                     <span className="project-id">ID: {project.project_id}</span>
                     <span className="project-owner">Owner: {project.owner_id}</span>
@@ -221,12 +239,6 @@ const ProjectDetails = () => {
 
             <div className="kanban-header">
                 <h2>Tasks</h2>
-                <button 
-                    className="create-task-btn"
-                    onClick={() => setShowCreateTaskModal(true)}
-                >
-                    + Create Task
-                </button>
             </div>
 
             <div className="kanban-board">
@@ -426,6 +438,13 @@ const ProjectDetails = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showBacklog && (
+                <ProjectBacklog 
+                    projectId={projectId} 
+                    onClose={() => setShowBacklog(false)} 
+                />
             )}
         </div>
     );

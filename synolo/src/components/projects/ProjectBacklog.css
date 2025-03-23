@@ -12,14 +12,6 @@
     overflow-y: auto;
     z-index: 1000;
     padding: 1.5rem;
-    pointer-events: auto;
-    transform: translate(-50%, -50%) !important;
-}
-
-/* Override any inherited hover effects */
-.project-backlog * {
-    pointer-events: auto;
-    transform: none !important;
 }
 
 .backlog-header {
@@ -29,8 +21,6 @@
     margin-bottom: 1.5rem;
     padding-bottom: 1rem;
     border-bottom: 1px solid #eaecef;
-    position: relative;
-    z-index: 1001;
 }
 
 .backlog-header h2 {
@@ -47,8 +37,6 @@
     cursor: pointer;
     padding: 0.5rem;
     line-height: 1;
-    position: relative;
-    z-index: 1001;
 }
 
 .close-button:hover {
@@ -59,16 +47,12 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1.5rem;
-    position: relative;
-    z-index: 1001;
 }
 
 .backlog-column {
     background-color: #f6f8fa;
     border-radius: 6px;
     padding: 1rem;
-    position: relative;
-    z-index: 1001;
 }
 
 .backlog-column h3 {
@@ -89,8 +73,6 @@
     border-radius: 6px;
     padding: 1rem;
     margin-bottom: 0.75rem;
-    position: relative;
-    z-index: 1001;
 }
 
 .task-card h4 {
