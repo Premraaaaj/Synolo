@@ -5,6 +5,7 @@ import ProjectDetails from './components/projects/ProjectDetails';
 import CreateProject from './components/projects/CreateProject';
 import Login from './components/auth/Login';
 import SignUp from './components/auth/SignUp';
+import Backlog from './components/backlog/Backlog';
 import './App.css';
 
 // Protected Route component
@@ -168,7 +169,7 @@ function App() {
                                     } />
                                     <Route path="/backlogs" element={
                                         <ProtectedRoute>
-                                            <div>Backlogs</div>
+                                            <Backlog />
                                         </ProtectedRoute>
                                     } />
                                     <Route path="/version-control" element={
