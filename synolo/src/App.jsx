@@ -6,6 +6,7 @@ import CreateProject from './components/projects/CreateProject';
 import Login from './components/auth/Login';
 import SignUp from './components/auth/SignUp';
 import Backlog from './components/backlog/Backlog';
+import DesignTab from './components/DesignTab';
 import './App.css';
 
 // Protected Route component
@@ -164,7 +165,7 @@ function App() {
                                     } />
                                     <Route path="/design" element={
                                         <ProtectedRoute>
-                                            <div>Design</div>
+                                            <DesignTab />
                                         </ProtectedRoute>
                                     } />
                                     <Route path="/backlogs" element={
