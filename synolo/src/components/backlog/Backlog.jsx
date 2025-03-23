@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { projectService } from '../../services/projectService';
-import './Backlog.css';
+// import './Backlog.css';
 
 const Backlog = () => {
     const [tasks, setTasks] = useState([]);

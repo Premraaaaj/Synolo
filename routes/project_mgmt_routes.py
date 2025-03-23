@@ -13,6 +13,7 @@ db = client['project_mgmt']
 users = db['users']
 projects = db['projects']
 tasks = db['tasks']
+designs = db['designs']  # New collection for Excalidraw drawings
 
 @bp.route('/signup', methods=['POST'])
 def signup():
@@ -334,3 +335,63 @@ def get_user_tasks():
     except Exception as e:
         print(f"Error in get_user_tasks: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@bp.route('/projects/<project_id>/designs', methods=['GET'])
+def get_project_designs(project_id):
+    """Get all designs for a project"""
+    project_designs = list(designs.find({'project_id': project_id}))
+    for design in project_designs:
+        design['_id'] = str(design['_id'])
+    return jsonify(project_designs)
+
+@bp.route('/projects/<project_id>/designs', methods=['POST'])
+def create_design(project_id):
+    """Create a new design for a project"""
+    data = request.json
+    if not data or not data.get('name') or not data.get('content'):
+        return jsonify({'error': 'Name and content required'}), 400
+
+    new_design = {
+        'project_id': project_id,
+        'name': data['name'],
+        'content': data['content'],
+        'created_at': datetime.utcnow(),
+        'updated_at': datetime.utcnow()
+    }
+    
+    result = designs.insert_one(new_design)
+    new_design['_id'] = str(result.inserted_id)
+    return jsonify(new_design), 201
+
+@bp.route('/designs/<design_id>', methods=['PUT'])
+def update_design(design_id):
+    """Update an existing design"""
+    data = request.json
+    if not data or not data.get('content'):
+        return jsonify({'error': 'Content required'}), 400
+
+    design = designs.find_one({'_id': ObjectId(design_id)})
+    if not design:
+        return jsonify({'error': 'Design not found'}), 404
+
+    designs.update_one(
+        {'_id': ObjectId(design_id)},
+        {
+            '$set': {
+                'content': data['content'],
+                'updated_at': datetime.utcnow()
+            }
+        }
+    )
+    
+    updated_design = designs.find_one({'_id': ObjectId(design_id)})
+    updated_design['_id'] = str(updated_design['_id'])
+    return jsonify(updated_design)
+
+@bp.route('/designs/<design_id>', methods=['DELETE'])
+def delete_design(design_id):
+    """Delete a design"""
+    result = designs.delete_one({'_id': ObjectId(design_id)})
+    if result.deleted_count == 0:
+        return jsonify({'error': 'Design not found'}), 404
+    return jsonify({'message': 'Design deleted successfully'})

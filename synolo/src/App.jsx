@@ -5,7 +5,10 @@ import ProjectDetails from './components/projects/ProjectDetails';
 import CreateProject from './components/projects/CreateProject';
 import Login from './components/auth/Login';
 import SignUp from './components/auth/SignUp';
+
 import Backlog from './components/backlog/Backlog';
+import DesignTab from './components/DesignTab';
+
 import './App.css';
 
 // Protected Route component
@@ -23,7 +26,11 @@ const ProtectedRoute = ({ children }) => {
                 credentials: 'include'
             });
             const data = await response.json();
+            // console.log('Auth check response:', data);
             setIsAuthenticated(data.authenticated);
+             if (data.authenticated==false) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
         } catch (error) {
             console.error('Auth check failed:', error);
             setIsAuthenticated(false);
@@ -34,9 +41,7 @@ const ProtectedRoute = ({ children }) => {
         return <div>Loading...</div>;
     }
 
-    if (!isAuthenticated) {
-        return <Navigate to="/login" state={{ from: location }} replace />;
-    }
+   
 
     return children;
 };
@@ -54,25 +59,33 @@ function App() {
         try {
             const storedUser = localStorage.getItem('user');
             if (storedUser) {
-                const parsedUser = JSON.parse(storedUser);
-                setUser(parsedUser);
-                
-                // Verify the session is still valid
-                const response = await fetch('http://localhost:5000/api/auth/check-auth', {
-                    credentials: 'include'
-                });
-                const data = await response.json();
-                
-                if (!data.authenticated) {
-                    // Session is invalid, clear user data
+                try {
+                    const parsedUser = JSON.parse(storedUser);
+                    if (!parsedUser.user_id) {
+                        throw new Error('Invalid user data');
+                    }
+                    setUser(parsedUser);
+                    
+                    // Verify the session is still valid
+                    const response = await fetch('http://localhost:5000/api/auth/check-auth', {
+                        credentials: 'include'
+                    });
+                    const data = await response.json();
+                    
+                    if (!data.authenticated) {
+                        // Session is invalid, clear user data
+                        localStorage.removeItem('user');
+                        setUser(null);
+                    }
+                } catch (parseError) {
+                    console.error('Error parsing user data:', parseError);
                     localStorage.removeItem('user');
                     setUser(null);
                 }
             }
         } catch (error) {
             console.error('Error checking user auth:', error);
-            localStorage.removeItem('user');
-            setUser(null);
+            // Don't clear user data on network errors
         } finally {
             setIsLoading(false);
         }
@@ -146,7 +159,9 @@ function App() {
                             <div className="main-content">
                                 <Routes>
                                     <Route path="/" element={<Navigate to="/projects" replace />} />
-                                    <Route path="/login" element={<Navigate to="/projects" replace />} />
+                                    <Route path="/login" element={
+                                        user ? <Navigate to="/projects" replace /> : <Login onLoginSuccess={(userData) => setUser(userData)} />
+                                    } />
                                     <Route path="/projects" element={
                                         <ProtectedRoute>
                                             <ProjectsList />
@@ -164,12 +179,12 @@ function App() {
                                     } />
                                     <Route path="/design" element={
                                         <ProtectedRoute>
-                                            <div>Design</div>
+                                            <DesignTab />
                                         </ProtectedRoute>
                                     } />
                                     <Route path="/backlogs" element={
                                         <ProtectedRoute>
-                                            <Backlog />
+                                            <div>Backlogs</div>
                                         </ProtectedRoute>
                                     } />
                                     <Route path="/version-control" element={

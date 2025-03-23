@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Routes, Route, Link } from 'react-router-dom';
 import { projectService } from '../../services/projectService';
 import ProjectBacklog from './ProjectBacklog';
+import DesignTab from '../DesignTab';
 import './ProjectDetails.css';
 
 const ProjectDetails = () => {
@@ -237,141 +238,157 @@ const ProjectDetails = () => {
                 <p>{project.project_description}</p>
             </div>
 
-            <div className="kanban-header">
-                <h2>Tasks</h2>
-            </div>
-
-            <div className="kanban-board">
-                <div className="kanban-column">
-                    <h3>Pending</h3>
-                    <div className="task-list">
-                        {getTasksByStatus('pending').map((task) => (
-                            <div key={task.task_id} className="task-card">
-                                <div className="task-header">
-                                    <h4>{task.task_name}</h4>
-                                    <div className="task-actions">
-                                        <div className="status-dropdown">
-                                            <button 
-                                                className="status-btn"
-                                                onClick={() => setEditingTaskId(editingTaskId === task.task_id ? null : task.task_id)}
-                                            >
-                                                {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                                            </button>
-                                            {editingTaskId === task.task_id && (
-                                                <div className="status-options">
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'pending')}>Pending</button>
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'in_progress')}>In Progress</button>
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'completed')}>Completed</button>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <button 
-                                            className="delete-task-btn"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setTaskToDelete(task);
-                                                setShowDeleteConfirm(true);
-                                            }}
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="task-meta">
-                                    <span>Assigned: {task.assigned_to}</span>
-                                    <span>Issued: {new Date(task.issued_date).toLocaleDateString()}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+            <div className="project-content">
+                <div className="project-nav">
+                    <Link to={`/projects/${projectId}`} className="nav-item">Tasks</Link>
+                    <Link to={`/projects/${projectId}/design`} className="nav-item">Design</Link>
                 </div>
 
-                <div className="kanban-column">
-                    <h3>In Progress</h3>
-                    <div className="task-list">
-                        {getTasksByStatus('in_progress').map((task) => (
-                            <div key={task.task_id} className="task-card">
-                                <div className="task-header">
-                                    <h4>{task.task_name}</h4>
-                                    <div className="task-actions">
-                                        <div className="status-dropdown">
-                                            <button 
-                                                className="status-btn"
-                                                onClick={() => setEditingTaskId(editingTaskId === task.task_id ? null : task.task_id)}
-                                            >
-                                                {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                                            </button>
-                                            {editingTaskId === task.task_id && (
-                                                <div className="status-options">
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'pending')}>Pending</button>
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'in_progress')}>In Progress</button>
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'completed')}>Completed</button>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <button 
-                                            className="delete-task-btn"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setTaskToDelete(task);
-                                                setShowDeleteConfirm(true);
-                                            }}
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
+                <div className="project-main">
+                    <Routes>
+                        <Route path="/" element={
+                            <div className="kanban-container">
+                                <div className="kanban-header">
+                                    <h2>Tasks</h2>
                                 </div>
-                                <div className="task-meta">
-                                    <span>Assigned: {task.assigned_to}</span>
-                                    <span>Issued: {new Date(task.issued_date).toLocaleDateString()}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
 
-                <div className="kanban-column">
-                    <h3>Completed</h3>
-                    <div className="task-list">
-                        {getTasksByStatus('completed').map((task) => (
-                            <div key={task.task_id} className="task-card">
-                                <div className="task-header">
-                                    <h4>{task.task_name}</h4>
-                                    <div className="task-actions">
-                                        <div className="status-dropdown">
-                                            <button 
-                                                className="status-btn"
-                                                onClick={() => setEditingTaskId(editingTaskId === task.task_id ? null : task.task_id)}
-                                            >
-                                                {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                                            </button>
-                                            {editingTaskId === task.task_id && (
-                                                <div className="status-options">
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'pending')}>Pending</button>
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'in_progress')}>In Progress</button>
-                                                    <button onClick={() => handleStatusChange(task.task_id, 'completed')}>Completed</button>
+                                <div className="kanban-board">
+                                    <div className="kanban-column">
+                                        <h3>Pending</h3>
+                                        <div className="task-list">
+                                            {getTasksByStatus('pending').map((task) => (
+                                                <div key={task.task_id} className="task-card">
+                                                    <div className="task-header">
+                                                        <h4>{task.task_name}</h4>
+                                                        <div className="task-actions">
+                                                            <div className="status-dropdown">
+                                                                <button 
+                                                                    className="status-btn"
+                                                                    onClick={() => setEditingTaskId(editingTaskId === task.task_id ? null : task.task_id)}
+                                                                >
+                                                                    {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                                                </button>
+                                                                {editingTaskId === task.task_id && (
+                                                                    <div className="status-options">
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'pending')}>Pending</button>
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'in_progress')}>In Progress</button>
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'completed')}>Completed</button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <button 
+                                                                className="delete-task-btn"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setTaskToDelete(task);
+                                                                    setShowDeleteConfirm(true);
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="task-meta">
+                                                        <span>Assigned: {task.assigned_to}</span>
+                                                        <span>Issued: {new Date(task.issued_date).toLocaleDateString()}</span>
+                                                    </div>
                                                 </div>
-                                            )}
+                                            ))}
                                         </div>
-                                        <button 
-                                            className="delete-task-btn"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setTaskToDelete(task);
-                                                setShowDeleteConfirm(true);
-                                            }}
-                                        >
-                                            ×
-                                        </button>
+                                    </div>
+
+                                    <div className="kanban-column">
+                                        <h3>In Progress</h3>
+                                        <div className="task-list">
+                                            {getTasksByStatus('in_progress').map((task) => (
+                                                <div key={task.task_id} className="task-card">
+                                                    <div className="task-header">
+                                                        <h4>{task.task_name}</h4>
+                                                        <div className="task-actions">
+                                                            <div className="status-dropdown">
+                                                                <button 
+                                                                    className="status-btn"
+                                                                    onClick={() => setEditingTaskId(editingTaskId === task.task_id ? null : task.task_id)}
+                                                                >
+                                                                    {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                                                </button>
+                                                                {editingTaskId === task.task_id && (
+                                                                    <div className="status-options">
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'pending')}>Pending</button>
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'in_progress')}>In Progress</button>
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'completed')}>Completed</button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <button 
+                                                                className="delete-task-btn"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setTaskToDelete(task);
+                                                                    setShowDeleteConfirm(true);
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="task-meta">
+                                                        <span>Assigned: {task.assigned_to}</span>
+                                                        <span>Issued: {new Date(task.issued_date).toLocaleDateString()}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="kanban-column">
+                                        <h3>Completed</h3>
+                                        <div className="task-list">
+                                            {getTasksByStatus('completed').map((task) => (
+                                                <div key={task.task_id} className="task-card">
+                                                    <div className="task-header">
+                                                        <h4>{task.task_name}</h4>
+                                                        <div className="task-actions">
+                                                            <div className="status-dropdown">
+                                                                <button 
+                                                                    className="status-btn"
+                                                                    onClick={() => setEditingTaskId(editingTaskId === task.task_id ? null : task.task_id)}
+                                                                >
+                                                                    {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                                                                </button>
+                                                                {editingTaskId === task.task_id && (
+                                                                    <div className="status-options">
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'pending')}>Pending</button>
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'in_progress')}>In Progress</button>
+                                                                        <button onClick={() => handleStatusChange(task.task_id, 'completed')}>Completed</button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <button 
+                                                                className="delete-task-btn"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setTaskToDelete(task);
+                                                                    setShowDeleteConfirm(true);
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="task-meta">
+                                                        <span>Assigned: {task.assigned_to}</span>
+                                                        <span>Completed: {task.completion_date ? new Date(task.completion_date).toLocaleDateString() : 'N/A'}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="task-meta">
-                                    <span>Assigned: {task.assigned_to}</span>
-                                    <span>Completed: {task.completion_date ? new Date(task.completion_date).toLocaleDateString() : 'N/A'}</span>
-                                </div>
                             </div>
-                        ))}
-                    </div>
+                        } />
+                        <Route path="/design" element={<DesignTab projectId={projectId} />} />
+                    </Routes>
                 </div>
             </div>
 

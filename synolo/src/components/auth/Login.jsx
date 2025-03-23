@@ -79,18 +79,18 @@ const Login = ({ onLoginSuccess }) => {
 
             // Create user object with the correct structure
             const userData = {
-                user_id: data.user_id,
-                username: data.username
+                user_id: data.user.id,
+                username: data.user.username
             };
 
             // Store user data in localStorage
             localStorage.setItem('user', JSON.stringify(userData));
-            
+            console.log('User data stored in localStorage:', userData);
             // Update parent component's user state
             onLoginSuccess(userData);
             
             // Navigate to projects page
-            navigate('/projects', { replace: true });
+           // navigate('/projects', { replace: true });
 
         } catch (err) {
             console.error('Login error:', err);
