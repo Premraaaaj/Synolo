@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { projectService } from '../../services/projectService';
+import ProjectBacklog from './ProjectBacklog';
 import './ProjectsList.css';
 
 const ProjectsList = () => {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [selectedProjectId, setSelectedProjectId] = useState(null);
     const location = useLocation();
 
     useEffect(() => {
@@ -54,6 +56,11 @@ const ProjectsList = () => {
                 setError('Failed to delete project');
             }
         }
+    };
+
+    const handleBacklogClick = (e, projectId) => {
+        e.stopPropagation();
+        setSelectedProjectId(projectId);
     };
 
     if (loading) {
@@ -119,6 +126,12 @@ const ProjectsList = () => {
                                         View Project
                                     </Link>
                                     <button 
+                                        onClick={(e) => handleBacklogClick(e, project.project_id)}
+                                        className="backlog-btn"
+                                    >
+                                        View Backlog
+                                    </button>
+                                    <button 
                                         onClick={() => handleDelete(project.project_id)}
                                         className="delete-project-btn"
                                     >
@@ -129,6 +142,13 @@ const ProjectsList = () => {
                         </div>
                     ))}
                 </div>
+            )}
+
+            {selectedProjectId && (
+                <ProjectBacklog 
+                    projectId={selectedProjectId} 
+                    onClose={() => setSelectedProjectId(null)} 
+                />
             )}
         </div>
     );

@@ -1,0 +1,134 @@
+.project-backlog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    width: 90%;
+    max-width: 1200px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 1000;
+    padding: 1.5rem;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) !important;
+}
+
+/* Override any inherited hover effects */
+.project-backlog * {
+    pointer-events: auto;
+    transform: none !important;
+}
+
+.backlog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eaecef;
+    position: relative;
+    z-index: 1001;
+}
+
+.backlog-header h2 {
+    margin: 0;
+    color: #24292e;
+    font-size: 1.5rem;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #6a737d;
+    cursor: pointer;
+    padding: 0.5rem;
+    line-height: 1;
+    position: relative;
+    z-index: 1001;
+}
+
+.close-button:hover {
+    color: #24292e;
+}
+
+.backlog-content {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    position: relative;
+    z-index: 1001;
+}
+
+.backlog-column {
+    background-color: #f6f8fa;
+    border-radius: 6px;
+    padding: 1rem;
+    position: relative;
+    z-index: 1001;
+}
+
+.backlog-column h3 {
+    margin: 0 0 1rem 0;
+    color: #24292e;
+    font-size: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eaecef;
+}
+
+.task-list {
+    min-height: 200px;
+}
+
+.task-card {
+    background-color: white;
+    border: 1px solid #eaecef;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+    z-index: 1001;
+}
+
+.task-card h4 {
+    margin: 0 0 0.5rem 0;
+    color: #24292e;
+    font-size: 0.9rem;
+}
+
+.task-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: #6a737d;
+}
+
+.backlog-loading {
+    text-align: center;
+    padding: 2rem;
+    color: #6a737d;
+}
+
+.backlog-error {
+    text-align: center;
+    padding: 2rem;
+    color: #cb2431;
+    background-color: #ffebee;
+    border-radius: 6px;
+    margin: 1rem;
+}
+
+@media (max-width: 768px) {
+    .backlog-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .project-backlog {
+        width: 95%;
+        max-height: 90vh;
+    }
+} 

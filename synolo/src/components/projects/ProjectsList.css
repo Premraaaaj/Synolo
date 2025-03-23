@@ -51,7 +51,6 @@
     color: #6c757d;
     cursor: pointer;
     border-radius: 6px;
-    transition: all 0.2s ease;
 }
 
 .view-toggle button.active {
@@ -66,7 +65,6 @@
     color: white;
     text-decoration: none;
     border-radius: 4px;
-    transition: background-color 0.2s ease;
 }
 
 .create-project-btn:hover {
@@ -99,7 +97,6 @@
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: all 0.2s ease;
 }
 
 .refresh-button:hover {
@@ -116,12 +113,11 @@
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .project-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .project-card-content {
@@ -167,7 +163,6 @@
     color: white;
     text-decoration: none;
     border-radius: 4px;
-    transition: background-color 0.2s ease;
 }
 
 .view-project-btn:hover {
@@ -181,7 +176,6 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.2s ease;
 }
 
 .delete-project-btn:hover {
@@ -213,7 +207,6 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.2s ease;
 }
 
 .retry-button:hover {
@@ -268,70 +261,63 @@
     }
 }
 
-/* Add smooth transition for drag and drop */
+/* Remove all hover effects */
 .projects-container > * {
-    transition: transform 0.2s ease;
+    transition: none;
 }
 
-/* Add visual feedback during drag */
 .projects-container > *:hover {
-    transform: translateY(-2px);
+    transform: none;
 }
 
-/* Ensure proper spacing in list view */
-.projects-container.list .project-card {
-    margin-bottom: 1rem;
+/* Remove animation and hover effects */
+.project-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Add a subtle animation when items are reordered */
+/* Remove hover effect */
+.project-card:hover {
+    transform: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Remove the slideIn animation keyframes */
 @keyframes slideIn {
     from {
-        opacity: 0;
-        transform: translateY(10px);
+        opacity: 1;
+        transform: none;
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: none;
     }
 }
 
-.projects-container > * {
-    animation: slideIn 0.2s ease;
-}
-
-/* Add a subtle indicator for draggable items */
+/* Remove the draggable indicator */
 .project-card::before {
-    content: '';
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    width: 8px;
-    height: 8px;
-    background-color: #eaecef;
-    border-radius: 50%;
-    opacity: 0;
-    transition: opacity 0.2s ease;
+    display: none;
 }
 
-.project-card:hover::before {
-    opacity: 1;
-}
-
+/* Remove the drag handle styles */
 .drag-handle {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    padding: 5px;
-    cursor: grab;
-    color: #666;
-    z-index: 1;
-}
-
-.drag-handle:active {
-    cursor: grabbing;
+    display: none;
 }
 
 .drag-icon {
-    font-size: 20px;
-    line-height: 1;
+    display: none;
+}
+
+.backlog-btn {
+    padding: 0.5rem 1rem;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.backlog-btn:hover {
+    background-color: #5a6268;
 } 
