@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { projectService } from '../../services/projectService';
 import './ProjectsList.css';
 
@@ -7,10 +7,11 @@ const ProjectsList = () => {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const location = useLocation();
 
     useEffect(() => {
         fetchProjects();
-    }, []);
+    }, [location.pathname]); // Refresh when route changes (e.g., after creating a project)
 
     const fetchProjects = async () => {
         try {
@@ -22,8 +23,14 @@ const ProjectsList = () => {
             console.log('Received projects data:', data);
             
             if (data && Array.isArray(data)) {
-                setProjects(data);
-                console.log('Projects set in state:', data);
+                // Sort projects by creation date, newest first
+                const sortedProjects = data.sort((a, b) => {
+                    const dateA = new Date(a.created_at || a.createdAt);
+                    const dateB = new Date(b.created_at || b.createdAt);
+                    return dateB - dateA;
+                });
+                setProjects(sortedProjects);
+                console.log('Projects set in state:', sortedProjects);
             } else {
                 console.error('Invalid projects data structure:', data);
                 setProjects([]);
@@ -74,9 +81,14 @@ const ProjectsList = () => {
         <div className="projects-container">
             <div className="projects-header">
                 <h1>My Projects</h1>
-                <Link to="/projects/new" className="create-project-btn">
-                    Create New Project
-                </Link>
+                <div className="header-actions">
+                    <button onClick={fetchProjects} className="refresh-button">
+                        Refresh
+                    </button>
+                    <Link to="/projects/new" className="create-project-btn">
+                        Create New Project
+                    </Link>
+                </div>
             </div>
 
             {projects.length === 0 ? (
@@ -99,7 +111,7 @@ const ProjectsList = () => {
                                 <div className="project-meta">
                                     <span className="project-status">{project.status || 'Active'}</span>
                                     <span className="project-date">
-                                        Created: {new Date(project.created_at).toLocaleDateString()}
+                                        Created: {new Date(project.created_at || project.createdAt).toLocaleDateString()}
                                     </span>
                                 </div>
                                 <div className="project-actions">

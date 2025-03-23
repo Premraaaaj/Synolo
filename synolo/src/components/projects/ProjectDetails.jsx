@@ -19,6 +19,7 @@ const ProjectDetails = () => {
         status: 'pending'
     });
     const [editingTaskId, setEditingTaskId] = useState(null);
+    const [successMessage, setSuccessMessage] = useState(null);
 
     useEffect(() => {
         fetchProjectData();
@@ -30,14 +31,18 @@ const ProjectDetails = () => {
             // Fetch project details
             const projectData = await projectService.getProject(projectId);
             setProject(projectData);
+            // console.log('Project data:------------------------------', projectData);
 
             // Fetch project tasks
             const tasksResponse = await projectService.getProjectTasks(projectId);
-            if (tasksResponse && tasksResponse.tasks) {
-                setTasks(tasksResponse.tasks);
-            } else {
-                setTasks([]);
-            }
+            
+                if (tasksResponse && tasksResponse) {
+                    setTasks(tasksResponse);
+                } else {
+                    
+                    setTasks([]);
+                }
+                // console.log('Tasks after fetching:++++++++++++++++++++++++', tasksResponse);
         } catch (err) {
             console.error('Error fetching project data:', err);
             setError('Failed to load project data');
@@ -49,48 +54,142 @@ const ProjectDetails = () => {
     const handleCreateTask = async (e) => {
         e.preventDefault();
         try {
-            const response = await projectService.createTask(projectId, newTask);
-            // Refresh tasks after creating a new one
-            const tasksResponse = await projectService.getProjectTasks(projectId);
-            if (tasksResponse && tasksResponse.tasks) {
-                setTasks(tasksResponse.tasks);
+            setLoading(true);
+            setError(null);
+            
+            // Get current user from localStorage
+            const userData = localStorage.getItem('user');
+            if (!userData) {
+                throw new Error('User not authenticated');
             }
+
+            const user = JSON.parse(userData);
+            const userId = user.user_id || user.id || user._id;
+            if (!userId) {
+                throw new Error('Invalid user ID');
+            }
+
+            // Create task data
+            const taskData = {
+                task_name: newTask.task_name,
+                description: newTask.description || '',
+                assigned_to: newTask.assigned_to,
+                status: 'pending',
+                issued_date: new Date().toISOString(),
+                project_id: projectId
+            };
+
+            console.log('Creating task with data:', taskData);
+            
+            // Create the task
+            await projectService.createTask(projectId, taskData);
+            
+            // Fetch updated tasks
+            const tasksResponse = await projectService.getProjectTasks(projectId);
+            console.log('Tasks response after creation:', tasksResponse);
+            
+            // Update tasks state with the new data
+            if (Array.isArray(tasksResponse)) {
+                setTasks(tasksResponse);
+            } else if (tasksResponse && Array.isArray(tasksResponse.tasks)) {
+                setTasks(tasksResponse.tasks);
+            } else {
+                console.error('Invalid tasks data structure:', tasksResponse);
+                throw new Error('Invalid response format from server');
+            }
+
+            // Reset form and close modal
+            setNewTask({
+                task_name: '',
+                description: '',
+                assigned_to: '',
+                status: 'pending'
+            });
             setShowCreateTaskModal(false);
-            setNewTask({ task_name: '', assigned_to: '', status: 'pending' });
+            
+            // Show success message
+            setSuccessMessage('Task created successfully!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
         } catch (err) {
             console.error('Error creating task:', err);
-            setError('Failed to create task');
+            setError('Failed to create task. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleDeleteTask = async (taskId) => {
         try {
-            await projectService.deleteTask(taskId);
-            // Refresh tasks after deletion
-            const tasksResponse = await projectService.getProjectTasks(projectId);
-            if (tasksResponse && tasksResponse.tasks) {
-                setTasks(tasksResponse.tasks);
+            setLoading(true);
+            setError(null);
+            
+            console.log('Deleting task:', { projectId, taskId });
+            
+            // Delete the task and get updated tasks list
+            const response = await projectService.deleteTask(projectId, taskId);
+            console.log('Delete task response:', response);
+            
+            // Update tasks state with the new data
+            if (response && Array.isArray(response.tasks)) {
+                setTasks(response.tasks);
+            } else {
+                console.error('Invalid tasks data structure:', response);
+                throw new Error('Invalid response format from server');
             }
+
+            // Reset deletion confirmation state
             setShowDeleteConfirm(false);
             setTaskToDelete(null);
+            
+            // Show success message
+            setSuccessMessage('Task deleted successfully!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
         } catch (err) {
             console.error('Error deleting task:', err);
-            setError('Failed to delete task');
+            setError('Failed to delete task. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleStatusChange = async (taskId, newStatus) => {
         try {
-            await projectService.updateTaskStatus(taskId, newStatus);
-            // Refresh tasks after status update
+            setLoading(true);
+            setError(null);
+            
+            console.log('Updating task status:', { taskId, newStatus, projectId });
+            
+            // Update the task status
+            await projectService.updateTaskStatus(projectId, taskId, newStatus);
+            
+            // Fetch updated tasks
             const tasksResponse = await projectService.getProjectTasks(projectId);
-            if (tasksResponse && tasksResponse.tasks) {
+            console.log('Tasks response after status update:', tasksResponse);
+            
+            // Update tasks state with the new data
+            if (Array.isArray(tasksResponse)) {
+                setTasks(tasksResponse);
+            } else if (tasksResponse && Array.isArray(tasksResponse.tasks)) {
                 setTasks(tasksResponse.tasks);
+            } else {
+                console.error('Invalid tasks data structure:', tasksResponse);
+                throw new Error('Invalid response format from server');
             }
+
+            // Reset editing state
             setEditingTaskId(null);
+            
+            // Show success message
+            setSuccessMessage('Task status updated successfully!');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            
         } catch (err) {
             console.error('Error updating task status:', err);
-            setError('Failed to update task status');
+            setError('Failed to update task status. Please try again.');
+        } finally {
+            setLoading(false);
         }
     };
 

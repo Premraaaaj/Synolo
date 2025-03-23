@@ -199,30 +199,14 @@ export const projectService = {
     // Create a new task
     createTask: async (projectId, taskData) => {
         try {
-            if (!taskData.task_name || !taskData.assigned_to) {
-                throw new Error('Task name and assignee are required');
-            }
-
-            const response = await axiosInstance.post(`/api/projects/${projectId}/tasks`, {
-                task_name: taskData.task_name,
-                assigned_to: taskData.assigned_to,
-                status: taskData.status || 'pending'
-            });
-
-            if (!response.data || !response.data.task_id) {
-                throw new Error('Invalid response format from server');
-            }
-
-            return {
-                task_id: response.data.task_id,
-                task_name: taskData.task_name,
-                assigned_to: taskData.assigned_to,
-                status: taskData.status || 'pending',
-                project_id: projectId
-            };
+            console.log('Creating task with data:', taskData);
+            const response = await axiosInstance.post(`/api/projects/${projectId}/tasks`, taskData);
+            console.log('Task creation response:', response.data);
+            return response.data;
         } catch (error) {
             console.error('Error creating task:', error);
             if (error.response) {
+                console.error('Server response:', error.response.data);
                 throw new Error(error.response.data.error || 'Failed to create task');
             }
             throw new Error('Network error while creating task');
@@ -230,13 +214,16 @@ export const projectService = {
     },
 
     // Update task status
-    updateTaskStatus: async (taskId, status) => {
+    updateTaskStatus: async (projectId, taskId, newStatus) => {
         try {
-            const response = await axiosInstance.put(`/api/tasks/${taskId}`, { status });
+            console.log('Updating task status:', { projectId, taskId, newStatus });
+            const response = await axiosInstance.put(`/api/projects/${projectId}/tasks/${taskId}`, { status: newStatus });
+            console.log('Task status update response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error updating task status:', error);
             if (error.response) {
+                console.error('Server response:', error.response.data);
                 throw new Error(error.response.data.error || 'Failed to update task status');
             }
             throw new Error('Network error while updating task status');
@@ -246,14 +233,45 @@ export const projectService = {
     // Delete a task
     deleteTask: async (projectId, taskId) => {
         try {
-            const response = await axiosInstance.delete(`/api/tasks/${taskId}`);
+            console.log('Deleting task:', { projectId, taskId });
+            const response = await axiosInstance.delete(`/api/projects/${projectId}/tasks/${taskId}`);
+            console.log('Task deletion response:', response.data);
             return response.data;
         } catch (error) {
             console.error('Error deleting task:', error);
             if (error.response) {
+                console.error('Server response:', error.response.data);
                 throw new Error(error.response.data.error || 'Failed to delete task');
             }
             throw new Error('Network error while deleting task');
+        }
+    },
+
+    getProjectById: async (projectId) => {
+        try {
+            console.log('Fetching project details for ID:', projectId);
+            const response = await axiosInstance.get(`/api/projects/${projectId}`);
+            console.log('Project details response:', response.data);
+            
+            if (!response.data) {
+                throw new Error('No project data received');
+            }
+
+            // Ensure tasks array exists and is properly formatted
+            const project = {
+                ...response.data,
+                tasks: response.data.tasks || []
+            };
+
+            console.log('Processed project data:', project);
+            return project;
+        } catch (error) {
+            console.error('Error fetching project details:', error);
+            if (error.response) {
+                console.error('Server response:', error.response.data);
+                throw new Error(error.response.data.error || 'Failed to fetch project details');
+            }
+            throw new Error('Network error while fetching project details');
         }
     }
 }; 

@@ -286,3 +286,51 @@ def update_task_status(task_id):
         return jsonify({'message': 'Task status updated successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+@bp.route('/tasks/user', methods=['GET'])
+def get_user_tasks():
+    """Get all tasks assigned to the current user"""
+    try:
+        # Get user_id from request headers
+        user_id = request.headers.get('X-User-ID')
+        if not user_id:
+            return jsonify({'error': 'User ID not provided'}), 400
+
+        print(f"Fetching tasks for user ID: {user_id}")  # Debug log
+
+        # Get all tasks where user is assigned
+        user_tasks = list(tasks.find({'assigned_to': user_id}))
+        print(f"Found {len(user_tasks)} tasks for user")  # Debug log
+
+        # Get project details for each task
+        processed_tasks = []
+        for task in user_tasks:
+            # Get project details
+            project = projects.find_one({'_id': ObjectId(task['project_id'])})
+            if project:
+                processed_task = {
+                    'task_id': str(task['_id']),
+                    'task_name': task['task_name'],
+                    'description': task.get('description', ''),
+                    'status': task['status'],
+                    'assigned_to': task['assigned_to'],
+                    'project_name': project['project_name'],
+                    'project_id': str(project['_id']),
+                    'issued_date': task['issued_date'],
+                    'completion_date': task.get('completion_date')
+                }
+                processed_tasks.append(processed_task)
+
+        # Sort tasks by status and date
+        processed_tasks.sort(key=lambda x: (
+            {'pending': 0, 'in_progress': 1, 'completed': 2}[x['status']],
+            x['issued_date']
+        ))
+
+        print(f"Returning {len(processed_tasks)} processed tasks")  # Debug log
+        return jsonify({
+            'tasks': processed_tasks
+        }), 200
+    except Exception as e:
+        print(f"Error in get_user_tasks: {str(e)}")
+        return jsonify({'error': str(e)}), 500
