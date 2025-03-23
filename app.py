@@ -1,31 +1,60 @@
-from flask import Flask
-from flasgger import Swagger  # type: ignore
+from flask import Flask, jsonify
+from flask_cors import CORS
+from flask_session import Session
 from pymongo import MongoClient
 import logging
-from flask_cors import CORS
+import os
+
+# Setup logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
-swagger = Swagger(app)
+
+# Session configuration
+app.config['SECRET_KEY'] = os.urandom(24)
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# CORS configuration
+CORS(app, 
+     resources={
+         r"/api/*": {
+             "origins": ["http://localhost:3000"],
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "allow_headers": ["Content-Type", "Authorization"],
+             "supports_credentials": True
+         }
+     })
+
+# Initialize session
+Session(app)
 
 # MongoDB connection
-client = MongoClient('mongodb://localhost:27017/')
-db = client['version_control_system']
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+try:
+    client = MongoClient('mongodb://localhost:27017/')
+    db = client['project_management']
+    logger.info("Successfully connected to MongoDB")
+except Exception as e:
+    logger.error(f"Failed to connect to MongoDB: {str(e)}")
+    raise
 
 # Import routes
-from routes import repo_routes, file_routes, project_mgmt_routes
+from routes import project_mgmt_routes, auth_routes
 
-# Register Blueprints
-app.register_blueprint(repo_routes.bp, url_prefix='/api')
-app.register_blueprint(file_routes.bp, url_prefix='/api')
-app.register_blueprint(project_mgmt_routes.bp, url_prefix='/api')
+# Register blueprints
+app.register_blueprint(project_mgmt_routes.bp, url_prefix='/api/projects')
+app.register_blueprint(auth_routes.bp, url_prefix='/api/auth')
+
+@app.route('/')
+def index():
+    return jsonify({"message": "Welcome to the Project Management API"})
 
 if __name__ == '__main__':
     from utils import setup_mongodb_indexes
     setup_mongodb_indexes(db)
-    app.run(debug=True)
+    logger.info("Starting Flask server on http://localhost:5000")
+    app.run(host='0.0.0.0', port=5000, debug=True)

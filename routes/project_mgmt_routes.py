@@ -225,3 +225,41 @@ def delete_task(task_id):
         return jsonify({'message': 'Task deleted successfully'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+@bp.route('/tasks/<task_id>', methods=['PUT'])
+def update_task_status(task_id):
+    """Update task status"""
+    try:
+        data = request.json
+        if not data or not data.get('status'):
+            return jsonify({'error': 'Status is required'}), 400
+
+        # Validate status
+        valid_statuses = ['pending', 'in_progress', 'completed']
+        if data['status'] not in valid_statuses:
+            return jsonify({'error': 'Invalid status'}), 400
+
+        # Find the task
+        task = tasks.find_one({'_id': ObjectId(task_id)})
+        if not task:
+            return jsonify({'error': 'Task not found'}), 404
+
+        # Prepare update data
+        update_data = {'status': data['status']}
+        
+        # If status is completed, add completion date
+        if data['status'] == 'completed':
+            update_data['completion_date'] = datetime.utcnow()
+        # If status is changed from completed, remove completion date
+        elif task.get('status') == 'completed':
+            update_data['completion_date'] = None
+
+        # Update the task
+        tasks.update_one(
+            {'_id': ObjectId(task_id)},
+            {'$set': update_data}
+        )
+        
+        return jsonify({'message': 'Task status updated successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
